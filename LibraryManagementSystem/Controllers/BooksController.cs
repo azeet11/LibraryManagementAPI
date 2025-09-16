@@ -1,4 +1,5 @@
 ﻿using LibraryManagementSystem.Models;
+using LibraryManagementSystem.Models.Dtos;
 using LibraryManagementSystem.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,8 +19,9 @@ public class BooksController : ControllerBase
     }
 
     [HttpPost]
-    public IActionResult AddBook([FromBody] Book book)
+    public IActionResult AddBook([FromBody] BookDto bookDto)
     {
+        var book = new Book { Title = bookDto.Title };
         _bookService.AddBook(book);
         return Ok("Book added successfully!");
     }
@@ -30,36 +32,40 @@ public class BooksController : ControllerBase
         return Ok(_bookService.GetAllBooks());
     }
 
-    // Borrow a book
     [HttpPost("{bookId}/borrow/{memberId}")]
     public IActionResult BorrowBook(int bookId, int memberId)
     {
-        var book = _bookService.GetAllBooks().FirstOrDefault(b => b.Id == bookId);
-        var member = _memberService.GetAllMembers().FirstOrDefault(m => m.Id == memberId);
+        var book = _bookService.GetAllBooks()
+            .Select(b => new Book { Id = b.Id, Title = b.Title, IsBorrowed = b.IsBorrowed })
+            .FirstOrDefault(b => b.Id == bookId);
 
-        if (book == null || member == null)
-            return NotFound("Book or Member not found");
+        var member = _memberService.GetAllMembers()
+            .Select(m => new Member { Id = m.Id, Name = m.Name })
+            .FirstOrDefault(m => m.Id == memberId);
+
+        if (book == null || member == null) return NotFound("Book or Member not found");
 
         var success = _bookService.Borrow(book, member);
-        if (!success)
-            return BadRequest("Book is already borrowed");
+        if (!success) return BadRequest("Book is already borrowed");
 
         return Ok($"{member.Name} borrowed '{book.Title}' successfully!");
     }
 
-    // Return a book
     [HttpPost("{bookId}/return/{memberId}")]
     public IActionResult ReturnBook(int bookId, int memberId)
     {
-        var book = _bookService.GetAllBooks().FirstOrDefault(b => b.Id == bookId);
-        var member = _memberService.GetAllMembers().FirstOrDefault(m => m.Id == memberId);
+        var book = _bookService.GetAllBooks()
+            .Select(b => new Book { Id = b.Id, Title = b.Title, IsBorrowed = b.IsBorrowed })
+            .FirstOrDefault(b => b.Id == bookId);
 
-        if (book == null || member == null)
-            return NotFound("Book or Member not found");
+        var member = _memberService.GetAllMembers()
+            .Select(m => new Member { Id = m.Id, Name = m.Name })
+            .FirstOrDefault(m => m.Id == memberId);
+
+        if (book == null || member == null) return NotFound("Book or Member not found");
 
         var success = _bookService.Return(book, member);
-        if (!success)
-            return BadRequest("Book was not borrowed");
+        if (!success) return BadRequest("Book was not borrowed");
 
         return Ok($"{member.Name} returned '{book.Title}' successfully!");
     }
@@ -67,7 +73,6 @@ public class BooksController : ControllerBase
     [HttpGet("loans")]
     public IActionResult GetAllLoans()
     {
-        var loans = _bookService.GetLoans();
-        return Ok(loans);
+        return Ok(_bookService.GetLoans());
     }
 }
