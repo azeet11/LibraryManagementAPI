@@ -1,73 +1,88 @@
-﻿using LibraryManagementSystem.Interfaces;
+﻿using LibraryManagementSystem.Data;
 using LibraryManagementSystem.Models;
+using LibraryManagementSystem.Models.Dtos;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibraryManagementSystem.Services;
 
-public class BookService : IBorrowable
+public class BookService
 {
-    private readonly IBookRepository _bookRepository;
-    private readonly INotificationService _notificationService;
+    private readonly LibraryDbContext _context;
 
-    // Track loans (in-memory)
-    private readonly List<Loan> _loans = new();
-
-    public BookService(IBookRepository bookRepository, INotificationService notificationService)
+    public BookService(LibraryDbContext context)
     {
-        _bookRepository = bookRepository;
-        _notificationService = notificationService;
+        _context = context;
     }
 
     public void AddBook(Book book)
     {
-        _bookRepository.AddBook(book);
-        _notificationService.Notify($"Book '{book.Title}' added!");
+        _context.Books.Add(book);
+        _context.SaveChanges();
     }
 
-    public IEnumerable<Book> GetAllBooks()
+    public IEnumerable<BookDto> GetAllBooks()
     {
-        return _bookRepository.GetAllBooks();
+        return _context.Books
+            .Select(b => new BookDto
+            {
+                Id = b.Id,
+                Title = b.Title,
+                IsBorrowed = b.IsBorrowed
+            })
+            .ToList();
     }
 
     public bool Borrow(Book book, Member member)
     {
-        if (book.IsBorrowed)
-            return false;
+        if (book.IsBorrowed) return false;
 
         book.IsBorrowed = true;
-        _bookRepository.UpdateBook(book);
 
-        _loans.Add(new Loan
+        var loan = new Loan
         {
             BookId = book.Id,
             MemberId = member.Id,
             BorrowedDate = DateTime.Now
-        });
+        };
 
-        _notificationService.Notify($"{member.Name} borrowed '{book.Title}'");
+        _context.Loans.Add(loan);
+        _context.SaveChanges();
+
         return true;
     }
 
     public bool Return(Book book, Member member)
     {
-        if (!book.IsBorrowed)
-            return false;
+        if (!book.IsBorrowed) return false;
 
         book.IsBorrowed = false;
-        _bookRepository.UpdateBook(book);
 
-        var loan = _loans.FirstOrDefault(l => l.BookId == book.Id && l.MemberId == member.Id && l.ReturnedDate == null);
+        var loan = _context.Loans
+            .FirstOrDefault(l => l.BookId == book.Id && l.MemberId == member.Id && l.ReturnedDate == null);
+
         if (loan != null)
         {
             loan.ReturnedDate = DateTime.Now;
         }
 
-        _notificationService.Notify($"{member.Name} returned '{book.Title}'");
+        _context.SaveChanges();
         return true;
     }
 
-    // Optional: Get all loans
-    public IEnumerable<Loan> GetLoans()
+    public IEnumerable<LoanDto> GetLoans()
     {
-        return _loans;
+        return _context.Loans
+            .Include(l => l.Book)
+            .Include(l => l.Member)
+            .Select(l => new LoanDto
+            {
+                BookId = l.BookId,
+                BookTitle = l.Book.Title,
+                MemberId = l.MemberId,
+                MemberName = l.Member.Name,
+                BorrowedDate = l.BorrowedDate,
+                ReturnedDate = l.ReturnedDate
+            })
+            .ToList();
     }
 }

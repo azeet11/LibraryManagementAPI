@@ -1,27 +1,37 @@
-﻿using LibraryManagementSystem.Interfaces;
+﻿using LibraryManagementSystem.Data;
 using LibraryManagementSystem.Models;
+using LibraryManagementSystem.Models.Dtos;
 
 namespace LibraryManagementSystem.Services;
 
 public class MemberService
 {
-    private readonly IMemberRepository _memberRepository;
-    private readonly INotificationService _notificationService;
+    private readonly LibraryDbContext _context;
 
-    public MemberService(IMemberRepository memberRepository, INotificationService notificationService)
+    public MemberService(LibraryDbContext context)
     {
-        _memberRepository = memberRepository;
-        _notificationService = notificationService;
+        _context = context;
     }
 
     public void AddMember(Member member)
     {
-        _memberRepository.AddMember(member);
-        _notificationService.Notify($"Member '{member.Name}' added!");
+        _context.Members.Add(member);
+        _context.SaveChanges();
     }
 
-    public IEnumerable<Member> GetAllMembers()
+    public IEnumerable<MemberDto> GetAllMembers()
     {
-        return _memberRepository.GetAllMembers();
+        return _context.Members
+            .Select(m => new MemberDto
+            {
+                Id = m.Id,
+                Name = m.Name
+            })
+            .ToList();
+    }
+
+    public Member? GetMemberById(int id)
+    {
+        return _context.Members.Find(id);
     }
 }
