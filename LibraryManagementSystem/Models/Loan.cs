@@ -6,4 +6,7 @@ public class Loan
     public int MemberId { get; set; }
     public DateTime BorrowedDate { get; set; } = DateTime.Now;
     public DateTime? ReturnedDate { get; set; }
+
+    public Book Book { get; set; }
+    public Member Member { get; set; }
 }
